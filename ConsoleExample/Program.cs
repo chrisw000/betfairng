@@ -5,6 +5,8 @@ using System.Configuration;
 using System.IO;
 using BetfairNG;
 using BetfairNG.Data;
+using Betfair.ESAClient.Cache;
+using Betfair.ESAClient.Protocol;
 
 // This example pulls the latest horse races in the UK markets
 // and displays them to the console.
@@ -38,9 +40,10 @@ public class ConsoleExample
          * MultiPeriodExample runs a version of MarketListenerPeriodic (MarketListenerMultiPeriod), using potentially differing poll intervals per market book
          */
 
-        //var example = new OriginalExample(client); // This example blocks within GO
+        var example = new OriginalExample(client); // This example blocks within GO
+        //var example = new StreamingExample(client, streamingClient); // Betfair Exchange Streaming API example
         //var example = new PeriodicExample(client, 0.5);
-        var example = new MultiPeriodExample(client);
+        //var example = new MultiPeriodExample(client);
         example.Go();
 
         if(!example.IsBlocking) Thread.Sleep(TimeSpan.FromMinutes(20));

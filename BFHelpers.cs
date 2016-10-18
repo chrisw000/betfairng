@@ -2,12 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Diagnostics;
-using System.Reactive;
-using System.Reactive.Linq;
-using System.Reactive.Concurrency;
-using System.Collections.Concurrent;
 using BetfairNG.Data;
 
 namespace BetfairNG
@@ -83,6 +77,22 @@ namespace BetfairNG
                 newList.Add(list[i]);
 
             return newList;
+        }
+
+        public static DateTime MarketCatalogueStartTime(MarketCatalogue marketCatalogue)
+        {
+            return marketCatalogue.MarketStartTime.CompareTo(DateTime.MinValue) == 0
+                ? Convert.ToDateTime(marketCatalogue.Description?.MarketTime)
+                : marketCatalogue.MarketStartTime;
+        }
+
+        public static string MarketCatalogConsole(MarketCatalogue marketCatalogue)
+        {
+            DateTime timeToOff = MarketCatalogueStartTime(marketCatalogue);
+
+            var timeRemainingToOff = timeToOff.Subtract(DateTime.UtcNow);
+            
+            return $"{marketCatalogue.MarketId} {marketCatalogue.Event?.Name} {marketCatalogue.MarketName} Time To Jump: {timeRemainingToOff.ToString("d'd 'h'h 'm'm 's's'")}";
         }
 
         public static string MarketBookConsole(

@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Collections.Concurrent;
 using System.Configuration;
+using System.IO;
 using BetfairNG;
 using BetfairNG.Data;
 
@@ -13,10 +14,24 @@ public class ConsoleExample
 
     public static void Main()
     {
-        // TODO:// replace with your app details and Betfair username/password
-        BetfairClient client = new BetfairClient(Exchange.UK, "APPKEY");
-        client.Login(@"client-2048.p12", "certpass", "username", "password");
+        BetfairClient client;
 
+        //TODO: see chat re TLS1.0 vs 2.0 bug + urls: #FRAMEWORK?
+        if (File.Exists("App.config"))
+        {
+            client = new BetfairClient(Exchange.UK, ConfigurationManager.AppSettings["bfAppKey"]);
+            client.Login(ConfigurationManager.AppSettings["logOnCertFile"],
+                            SecureStringManager.Unprotect("logOnCertFilePassword", true),
+                            SecureStringManager.Unprotect("bfUsername", true),
+                            SecureStringManager.Unprotect("bfPassword", true));
+        }
+        else
+        {
+            // TODO:// replace with your app details and Betfair username/password
+            client = new BetfairClient(Exchange.UK, "APPKEY");
+            client.Login(@"client-2048.p12", "certpass", "username", "password");
+        }
+        
         /*
          * OriginalExample runs the code originally in here, using the standard MarketListener
          * PeriodicExample runs a version of MarketListener (MarketListenerPeriodic), using an RX interval, specified in seconds

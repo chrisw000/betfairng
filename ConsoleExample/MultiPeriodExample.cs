@@ -11,7 +11,7 @@ public class MultiPeriodExample : IDisposable
     private readonly BetfairClient _client;
     private readonly ConcurrentQueue<MarketCatalogue> _markets = new ConcurrentQueue<MarketCatalogue>();
 
-    private MarketListenerMultiPeriod _marketListener;
+    private MarketListenerMultiPeriod _listener;
 
     private IDisposable _marketSubscription1;
     private IDisposable _marketSubscription2;
@@ -43,7 +43,7 @@ public class MultiPeriodExample : IDisposable
         });
         Console.WriteLine();
 
-        _marketListener = MarketListenerMultiPeriod.Create(_client, BFHelpers.HorseRacePriceProjection());
+        _listener = MarketListenerLiveData.Create(_client, BFHelpers.HorseRacePriceProjection());
 
         MarketCatalogue marketCatalogue1;
         MarketCatalogue marketCatalogue2;
@@ -56,7 +56,7 @@ public class MultiPeriodExample : IDisposable
         _id2 = marketCatalogue2.MarketId;
 
         // Red, every 1 second
-        _marketSubscription1 = _marketListener.SubscribeMarketBook(_id1, 1)
+        _marketSubscription1 = _listener.Subscribe(_id1, 1)
             .SubscribeOn(Scheduler.Default)
             .Subscribe(
                 marketBook =>
@@ -74,7 +74,7 @@ public class MultiPeriodExample : IDisposable
             );
 
         // Blue, every 2.5 second
-        _marketSubscription2 = _marketListener.SubscribeMarketBook(_id2, 2.5)
+        _marketSubscription2 = _listener.Subscribe(_id2, 2.5)
             .SubscribeOn(Scheduler.Default)
             .Subscribe(
                 marketBook =>
@@ -106,13 +106,13 @@ public class MultiPeriodExample : IDisposable
 
         if (_flipFlop)
         {
-            _marketListener.UpdatePollInterval(_id1, 2.5);
-            _marketListener.UpdatePollInterval(_id2, 1);
+            _listener.UpdatePollInterval(_id1, 2.5);
+            _listener.UpdatePollInterval(_id2, 1);
         }
         else
         {
-            _marketListener.UpdatePollInterval(_id1, 1);
-            _marketListener.UpdatePollInterval(_id2, 2.5);
+            _listener.UpdatePollInterval(_id1, 1);
+            _listener.UpdatePollInterval(_id2, 2.5);
         }
         _flipFlop = !_flipFlop;
     }

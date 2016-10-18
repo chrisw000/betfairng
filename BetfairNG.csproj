@@ -154,10 +154,16 @@
     <Compile Include="Data\TimeRange.cs" />
     <Compile Include="Data\TimeRangeResult.cs" />
     <Compile Include="Data\Wallet.cs" />
+    <Compile Include="IListenerMultiPeriod.cs" />
     <Compile Include="JsonConvert.cs" />
+    <Compile Include="ListenderMultiPeriod.cs" />
     <Compile Include="MarketListener.cs" />
+    <Compile Include="CatalogueListenerPeriodic.cs" />
+    <Compile Include="MarketListenerLiveData.cs" />
     <Compile Include="MarketListenerPeriodic.cs" />
     <Compile Include="MarketListenerMultiPeriod.cs" />
+    <Compile Include="MarketListenerPluggable.cs" />
+    <Compile Include="Poller.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Network.cs" />
   </ItemGroup>

@@ -328,7 +328,7 @@ namespace BetfairNG
 
         public Task<BetfairServerResponse<CancelExecutionReport>> CancelOrders(
             string marketId = null,
-            IList<CancelInstruction> instructions = null,
+            IEnumerable<CancelInstruction> instructions = null,
             string customerRef = null)
         {
             var args = new Dictionary<string, object>();
@@ -460,6 +460,7 @@ namespace BetfairNG
         public long LatencyMS { get; set; }
         public bool HasError { get; set; }
         public BetfairServerException Error { get; set; }
+        public string RequestJson { get; set; }
     }
 
     public class BetfairServerException : System.Exception

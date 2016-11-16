@@ -55,10 +55,9 @@ namespace BetfairNG
 
         public static double Best(this List<Data.PriceSize> prices)
         {
-            if (prices.Count > 0)
-                return prices.First().Price;
-            else
-                return 0.0;
+            return prices.Count > 0 
+                ? prices.First().Price 
+                : 0.0;
         }
 
         public static List<Order> Backs(this List<Order> orders)
@@ -282,40 +281,29 @@ namespace BetfairNG
             return Table.Contains(price);
         }
 
-        public static double AddPip(double price)
+        public static double AddPip(double price, int num = 1)
         {
+            if (num < 0) return SubtractPip(price, Math.Abs(num));
+
             if (!IsValidPrice(price))
                 throw new ApplicationException("Invalid Price");
 
-            int index = Array.IndexOf<double>(Table, price);
-            return Table[++index];
+            var index = Array.IndexOf<double>(Table, price) + num;
+            if (index > Table.Length - 1) index = Table.Length - 1;
+            return Table[index];
         }
 
-        public static double AddPip(double price, int num)
+        public static double SubtractPip(double price, int num = 1)
         {
+            if(num<0) return AddPip(price, Math.Abs(num));
+
             if (!IsValidPrice(price))
                 throw new ApplicationException("Invalid Price");
 
-            int index = Array.IndexOf<double>(Table, price);
-            return Table[index + num];
-        }
+            var index = Array.IndexOf<double>(Table, price) - num;
+            if (index - num < 0) index = 0;
 
-        public static double SubtractPip(double price)
-        {
-            if (!IsValidPrice(price))
-                throw new ApplicationException("Invalid Price");
-
-            int index = Array.IndexOf<double>(Table, price);
-            return Table[--index];
-        }
-
-        public static double SubtractPip(double price, int num)
-        {
-            if (!IsValidPrice(price))
-                throw new ApplicationException("Invalid Price");
-
-            int index = Array.IndexOf<double>(Table, price);
-            return Table[index - num];
+            return Table[index];
         }
 
         public static double RoundDownToNearestBetfairPrice(double price)

@@ -1,4 +1,6 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using BetfairNG.Data;
 
@@ -13,24 +15,28 @@ namespace BetfairNG
         private readonly MatchProjection? _matchProjection;
         private readonly PriceProjection _priceProjection;
         private readonly BetfairClient _client;
+        private readonly Action<System.Exception, string> _logger;
 
         private MarketListenerLiveData(BetfairClient client,
             PriceProjection priceProjection,
             OrderProjection? orderProjection,
-            MatchProjection? matchProjection)
+            MatchProjection? matchProjection,
+            Action<System.Exception, string> logger)
         {
             _client = client;
             _priceProjection = priceProjection;
             _orderProjection = orderProjection;
             _matchProjection = matchProjection;
+            _logger = logger;
         }
 
         public static MarketListenerLiveData Create(BetfairClient client,
             PriceProjection priceProjection,
             OrderProjection? orderProjection = null,
-            MatchProjection? matchProjection = null)
+            MatchProjection? matchProjection = null,
+            Action<System.Exception, string> logger = null)
         {
-            return new MarketListenerLiveData(client, priceProjection, orderProjection, matchProjection);
+            return new MarketListenerLiveData(client, priceProjection, orderProjection, matchProjection, logger);
         }
 
         protected override void DoWork(double pollinterval)
@@ -38,7 +44,20 @@ namespace BetfairNG
             ConcurrentDictionary<string, bool> bag;
             if (!PollIntervals.TryGetValue(pollinterval, out bag)) return;
 
-            var book = _client.ListMarketBook(bag.Keys, _priceProjection, _orderProjection, _matchProjection).Result;
+            BetfairServerResponse<List<MarketBook>> book;
+            try
+            {
+                book = _client.ListMarketBook(bag.Keys, _priceProjection, _orderProjection, _matchProjection).Result;
+            }
+            catch (AggregateException ex)
+            {
+                foreach (var e in ex.Flatten().InnerExceptions)
+                {
+                    _logger.Invoke(e, $"pollInterval {pollinterval}");
+                }
+                
+                return;
+            }
 
             if (book.HasError)
             {

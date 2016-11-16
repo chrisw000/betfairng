@@ -47,13 +47,12 @@ namespace BetfairNG
                     {
                         Observers.AddOrUpdate(id, observer, (key, existingVal) => existingVal);
                         return Disposable.Create(() =>
-                        {
+                        { 
                             IObserver<T> ob;
                             IObservable<T> o;
                             _observables.TryRemove(id, out o);
                             Observers.TryRemove(id, out ob);
-                      
-                            CleanUpPolling(id);
+                            TryCleanUpPolling(id);
                         });
                     })
                 .Publish()
@@ -120,7 +119,7 @@ namespace BetfairNG
             lock (LockObj)
             {
                 // First, remove the existing entry
-                CleanUpPolling(id);
+                TryCleanUpPolling(id);
                 // Now put this id into the new interval
                 SetupPolling(id, newPollIntervalInSeconds);
             }
@@ -151,8 +150,16 @@ namespace BetfairNG
             }
         }
 
-        private void CleanUpPolling(string id)
+        private void TryCleanUpPolling(string id)
         {
+            // Check if we're still holding the id against a polling interval
+            // Had there been multiple subscriptions for an id.. the first cleanup would have processed this
+            // already, meaning subsequent cleanups are not required.
+            if (PollIntervals.Any(search => search.Value.Keys.Contains(id)) == false)
+            {
+                return;
+            }
+
             // Find the interval that the id is now running under
             var interval = PollIntervals.First(search => search.Value.Keys.Contains(id)).Key;
 
@@ -177,15 +184,46 @@ namespace BetfairNG
             }
         }
 
-        /// <summary>
-        /// Clean up the Pollers
-        /// </summary>
+        #region Dispose
+        // http://stackoverflow.com/a/31016954/3744570
+        private bool _disposed;
+
         public void Dispose()
         {
-            foreach (var poller in Pollers)
-            {
-                poller.Value?.Dispose();
-            }
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            // Check to see if Dispose has already been called. 
+            if (_disposed) return;
+
+            // Dispose all managed resources. 
+            if (disposing)
+            {
+                // Dispose managed resources.
+                foreach (var poller in Pollers)
+                {
+                    poller.Value?.Dispose();
+                }
+            }
+
+            // Dispose all unmanaged resources. If anything goes here - uncomment the finalizer
+            // ... 
+
+            // Note disposing has been done.
+            _disposed = true;
+        }
+
+        // https://msdn.microsoft.com/en-us/library/ms244737.aspx?f=255&MSPPError=-2147217396
+        // NOTE: Leave out the finalizer altogether if this class doesn't   
+        // own unmanaged resources itself, but leave the other methods  
+        // exactly as they are.   
+        //~ListenerMultiPeriodic()
+        //{
+        //    Dispose(false);
+        //}
+        #endregion
     }
 }

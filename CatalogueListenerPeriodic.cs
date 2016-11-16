@@ -8,9 +8,19 @@ using BetfairNG.Data;
 
 namespace BetfairNG
 {
+    public enum MarketCatalogueFilter
+    {
+        None = 0,
+        McFilterCorrectScore = 1,
+        McFilterHorses = 2,
+        McFilterGreyhound = 3,
+        McFilterEmptyBrain = 4
+    }
+
     public class CatalogueFilter
     {
-        public string FilterId => GetHashCode().ToString();
+        //TODO: override this so that the _startOffsetHours/_endOffsetHours aren't part of the filterId
+        public MarketCatalogueFilter FilterId { get; set; } // =>  TODO: see above;GetHashCode().ToString();
 
         public MarketFilter MarketFilter
         {
@@ -35,26 +45,20 @@ namespace BetfairNG
         private double _startOffsetHours;
         private double _endOffsetHours;
 
-        private CatalogueFilter()
+        public CatalogueFilter(MarketCatalogueFilter filterId)
         {
+            FilterId = filterId;
             // Hide this
         }
 
-        public CatalogueFilter(MarketFilter baseMarketFilter)
+        public CatalogueFilter(MarketFilter baseMarketFilter, MarketCatalogueFilter filterId)
         {
             _startOffsetHours = baseMarketFilter.MarketStartTime.From.Subtract(DateTime.Now).TotalHours;
             _endOffsetHours = baseMarketFilter.MarketStartTime.To.Subtract(DateTime.Now).TotalHours;
 
             _baseMarketFilter = baseMarketFilter;
+            FilterId = filterId;
         }
-
-        public static CatalogueFilter HorseRacing
-                    => new CatalogueFilter(BFHelpers.HorseRaceFilter())
-                                    {
-                                        Projection = BFHelpers.HorseRaceProjection(),
-                                        MaxResult = 10
-                                        //,Period = 60 // TODO this isnt hooked up yet
-                                    };
     }
 
     public class CatalogueListenerPeriodic : IDisposable
@@ -67,30 +71,35 @@ namespace BetfairNG
 
         private readonly object _lockObj = new object();
 
-        private readonly ConcurrentDictionary<string, CatalogueFilter> _filters =
-            new ConcurrentDictionary<string, CatalogueFilter>();
+        private readonly ConcurrentDictionary<MarketCatalogueFilter, CatalogueFilter> _filters =
+            new ConcurrentDictionary<MarketCatalogueFilter, CatalogueFilter>();
 
-        private readonly ConcurrentDictionary<string, IObservable<List<MarketCatalogue>>> _catalogues =
-            new ConcurrentDictionary<string, IObservable<List<MarketCatalogue>>>();
+        private readonly ConcurrentDictionary<MarketCatalogueFilter, IObservable<List<MarketCatalogue>>> _catalogues =
+            new ConcurrentDictionary<MarketCatalogueFilter, IObservable<List<MarketCatalogue>>>();
 
         // the observer is the dispatcher per filter, which t
-        private readonly ConcurrentDictionary<string, IObserver<List<MarketCatalogue>>> _observers =
-            new ConcurrentDictionary<string, IObserver<List<MarketCatalogue>>>();
+        private readonly ConcurrentDictionary<MarketCatalogueFilter, IObserver<List<MarketCatalogue>>> _observers =
+            new ConcurrentDictionary<MarketCatalogueFilter, IObserver<List<MarketCatalogue>>>();
+
+        private readonly Action<System.Exception, string> _logger;
 
         private readonly IDisposable _polling;
 
         private CatalogueListenerPeriodic(BetfairClient client,
-            double periodInSec)
+            double periodInSec,
+            Action<System.Exception, string> logger = null)
         {
             _client = client;
+            _logger = logger;
             _polling = Observable.Interval(TimeSpan.FromSeconds(periodInSec),
-                                          NewThreadScheduler.Default).Subscribe(l => DoWork());
+                NewThreadScheduler.Default).Subscribe(l => DoWork());
         }
 
         public static CatalogueListenerPeriodic Create(BetfairClient client,
-            double periodInSec)
+            double periodInSec,
+            Action<System.Exception, string> logger = null)
         {
-            return new CatalogueListenerPeriodic(client, periodInSec);
+            return new CatalogueListenerPeriodic(client, periodInSec, logger);
         }
 
         public IObservable<List<MarketCatalogue>> SubscribeFilter(CatalogueFilter filter)
@@ -100,21 +109,21 @@ namespace BetfairNG
                 return lookup;
 
             var observable = Observable.Create<List<MarketCatalogue>>(
-               (IObserver<List<MarketCatalogue>> observer) =>
-               {
-                   _observers.AddOrUpdate(filter.FilterId, observer, (key, existingVal) => existingVal);
-                   return Disposable.Create(() =>
-                   {
-                           CatalogueFilter f;
-                           IObserver<List<MarketCatalogue>> ob;
-                           IObservable<List<MarketCatalogue>> o;
-                           _filters.TryRemove(filter.FilterId, out f);
-                           _catalogues.TryRemove(filter.FilterId, out o);
-                           _observers.TryRemove(filter.FilterId, out ob);
-                       });
-               })
-               .Publish()
-               .RefCount();
+                    (IObserver<List<MarketCatalogue>> observer) =>
+                    {
+                        _observers.AddOrUpdate(filter.FilterId, observer, (key, existingVal) => existingVal);
+                        return Disposable.Create(() =>
+                        {
+                            CatalogueFilter f;
+                            IObserver<List<MarketCatalogue>> ob;
+                            IObservable<List<MarketCatalogue>> o;
+                            _filters.TryRemove(filter.FilterId, out f);
+                            _catalogues.TryRemove(filter.FilterId, out o);
+                            _observers.TryRemove(filter.FilterId, out ob);
+                        });
+                    })
+                .Publish()
+                .RefCount();
 
             _filters.AddOrUpdate(filter.FilterId, filter, (key, existingVal) => existingVal);
             _catalogues.AddOrUpdate(filter.FilterId, observable, (key, existingVal) => existingVal);
@@ -133,14 +142,27 @@ namespace BetfairNG
                 DoWorkInner(key, _filters[key]);
             }
         }
-        private void DoWorkInner(string key, CatalogueFilter cf)
-        { 
 
-        var book = _client.ListMarketCatalogue(
-                    cf.MarketFilter, 
+        private void DoWorkInner(MarketCatalogueFilter key, CatalogueFilter cf)
+        {
+            BetfairServerResponse<List<MarketCatalogue>> book;
+
+            try
+            {
+                book = _client.ListMarketCatalogue(
+                    cf.MarketFilter,
                     cf.Projection,
                     cf.MarketSort,
                     cf.MaxResult).Result;
+            }
+            catch (AggregateException ex)
+            {
+                foreach (var e in ex.Flatten().InnerExceptions)
+                {
+                    _logger.Invoke(e, $"key: {key} filterId: {cf.FilterId}");
+                }
+                return;
+            }
 
             if (book.HasError)
             {
@@ -171,9 +193,43 @@ namespace BetfairNG
 
         }
 
+        #region Dispose
+        // http://stackoverflow.com/a/31016954/3744570
+        private bool _disposed;
+
         public void Dispose()
         {
-            _polling?.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            // Check to see if Dispose has already been called. 
+            if (_disposed) return;
+
+            // Dispose all managed resources. 
+            if (disposing)
+            {
+                // Dispose managed resources.
+                _polling?.Dispose();
+            }
+
+            // Dispose all unmanaged resources. If anything goes here - uncomment the finalizer
+            // ... 
+
+            // Note disposing has been done.
+            _disposed = true;
+        }
+
+        // https://msdn.microsoft.com/en-us/library/ms244737.aspx?f=255&MSPPError=-2147217396
+        // NOTE: Leave out the finalizer altogether if this class doesn't   
+        // own unmanaged resources itself, but leave the other methods  
+        // exactly as they are.   
+        //~CatalogueListenerPeriodic()
+        //{
+        //    Dispose(false);
+        //}
+        #endregion
     }
 }

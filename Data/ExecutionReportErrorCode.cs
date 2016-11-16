@@ -10,6 +10,7 @@ namespace BetfairNG.Data
     [JsonConverter(typeof(StringEnumConverter))]
     public enum ExecutionReportErrorCode
     {
+        OK,
         ERROR_IN_MATCHER,			
         PROCESSED_WITH_ERRORS,		
         BET_ACTION_ERROR,			

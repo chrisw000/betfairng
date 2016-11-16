@@ -10,6 +10,7 @@ namespace BetfairNG.Data
     [JsonConverter(typeof(StringEnumConverter))]
     public enum InstructionReportErrorCode
     {
+        OK,
         INVALID_BET_SIZE,					
         INVALID_RUNNER,						
         BET_TAKEN_OR_LAPSED,				

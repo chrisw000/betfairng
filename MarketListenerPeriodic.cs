@@ -129,9 +129,43 @@ namespace BetfairNG
 
         }
 
+        #region Dispose
+        // http://stackoverflow.com/a/31016954/3744570
+        private bool _disposed;
+
         public void Dispose()
         {
-            _polling?.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            // Check to see if Dispose has already been called. 
+            if (_disposed) return;
+
+            // Dispose all managed resources. 
+            if (disposing)
+            {
+                // Dispose managed resources.
+                _polling?.Dispose();
+            }
+
+            // Dispose all unmanaged resources. If anything goes here - uncomment the finalizer
+            // ... 
+
+            // Note disposing has been done.
+            _disposed = true;
+        }
+
+        // https://msdn.microsoft.com/en-us/library/ms244737.aspx?f=255&MSPPError=-2147217396
+        // NOTE: Leave out the finalizer altogether if this class doesn't   
+        // own unmanaged resources itself, but leave the other methods  
+        // exactly as they are.   
+        //~MarketListenerPeriodic()
+        //{
+        //    Dispose(false);
+        //}
+        #endregion
     }
 }

@@ -13,6 +13,6 @@ namespace BetfairNG.Data
         public string BetId { get; set; }
 
         [JsonProperty(PropertyName = "sizeReduction")]
-        public double SizeReduction { get; set; }
+        public double? SizeReduction { get; set; }
     }
 }
